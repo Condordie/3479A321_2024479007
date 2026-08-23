@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/cell_type.dart';
 
 class PegSolitaireScreen extends StatelessWidget {
   const PegSolitaireScreen({Key? key}) : super(key: key);
+  static const int gridSize = 7; // Tamaño del tablero (7x7)
+  static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
+
+  CellType _getCellType(int row,int col){
+    final bool isCorner = (row < 2 || row > 4) && (col < 2 || col > 4);
+    if(isCorner){
+      return CellType.voidCell; // Esquina 2x2 fuera de límites jugables
+    }
+    return CellType.occupiedPeg; // Casilla jugable con clavija presente
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,16 +56,36 @@ class PegSolitaireScreen extends StatelessWidget {
             ),
             itemCount: 49, // 7x7 = 49 celdas
             itemBuilder: (context, index) {
-            return Container(
+              // Convertir el índice en coordenadas matriciales
+              final int row = index ~/ gridSize;
+              final int col = index % gridSize;
+              final CellType cellType = _getCellType(row, col);
+
+              return Container(
                 decoration: BoxDecoration(
                   color: Colors.grey[400],
                   border: Border.all(color: Colors.grey[600]!, width: 1.5),
                 ),
                 child: Center(
-                  child: Text(
-                    '$index', // Muestra el índice de la celda
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  child: cellType == CellType.occupiedPeg
+                      ? Container(
+                          width: 30,
+                          height: 30,
+                          decoration: const BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                      : cellType == CellType.emptyHole
+                          ? Container(
+                              width: 30,
+                              height: 30,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            )
+                          : null, // No dibuja nada para voidCell
                 ),
               );
             },
