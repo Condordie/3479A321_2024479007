@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'peg_solitaire_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Solitario Ingles',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const Text('Hello, World!'), // Apuntamos a nuestra nueva pantalla
+      home: const PegSolitaireScreen(),
     );
   }
 }
