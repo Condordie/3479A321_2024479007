@@ -9,9 +9,8 @@ class PegSolitaireScreen extends StatelessWidget {
 
   CellType _getCellType(int row,int col){
     final bool isCorner = (row < 2 || row > 4) && (col < 2 || col > 4);
-    if(isCorner){
-      return CellType.voidCell; // Esquina 2x2 fuera de límites jugables
-    }
+    if(isCorner) return CellType.voidCell; // Casilla no jugable
+    if(row == 3 && col == 3) return CellType.emptyHole; // Casilla jugable vacía
     return CellType.occupiedPeg; // Casilla jugable con clavija presente
   }
   @override
