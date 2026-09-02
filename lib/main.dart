@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'peg_solitaire_screen.dart';
+import 'ui/screens/peg_solitaire_screen.dart';
 
 void main() {
   runApp(const MyApp());

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:untitled/cell_type.dart';
+import 'package:untitled/core/enums/cell_type.dart';
 
 class PegSolitaireScreen extends StatelessWidget {
   const PegSolitaireScreen({Key? key}) : super(key: key);
