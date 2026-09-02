@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Solitario Ingles',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const PegSolitaireScreen(),
+      home: PegSolitaireScreen(),
     );
   }
 }

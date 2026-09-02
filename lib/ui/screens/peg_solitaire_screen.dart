@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:untitled/core/enums/cell_type.dart';
-import 'package:untitled/ui/screens/NuevaPantalla.dart';
+import 'package:untitled/ui/screens/RulesScreen.dart';
 
 class PegSolitaireScreen extends StatelessWidget {
   const PegSolitaireScreen({Key? key}) : super(key: key);
   static const int gridSize = 7; // Tamaño del tablero (7x7)
   static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
+  static final Logger _logger = Logger();// placeholder eliminado abajo
 
   CellType _getCellType(int row, int col) {
     final bool isCorner = (row < 2 || row > 4) && (col < 2 || col > 4);
@@ -25,7 +27,7 @@ class PegSolitaireScreen extends StatelessWidget {
             icon: const Icon(Icons.help_outline),
             tooltip: 'Reglas del juego',
             onPressed: () {
-              // _logger.i('Navegando a RulesScreen desde PegSolitaireScreen');
+              _logger.i('Navegando a RulesScreen desde PegSolitaireScreen');
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const RulesScreen()),

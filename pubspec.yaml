@@ -81,11 +81,10 @@ flutter:
         - asset: assets/images/auto.jpg
         - asset: assets/images/auto2.jpg
   #        style: italic
-  #  - family: Trajan Pro
-  #    fonts:
-  #      - asset: assets/fonts/ArianaVioleta.ttf
-  #      - asset: fonts/TrajanPro_Bold.ttf
-  #        weight: 700
+    - family: ArianaVioleta
+      fonts:
+        - asset: assets/font/ArianaVioleta-dz2K.ttf
+          weight: 700
   
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

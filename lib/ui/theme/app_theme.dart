@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 
-
 class AppTheme {
-  static const Color primarySeed = Color(0xFF5D4037); // Un color de Ejemplo.
+  static const Color primarySeed = Color.fromARGB(255, 255, 60, 0); // Un color de Ejemplo.
   static const Color boardBaseColor = Color (0xFFD7CCC8);
   static const Color emptyHoleColor = Color (0xFFB71C1C);
 
@@ -22,8 +21,9 @@ class AppTheme {
         backgroundColor: primarySeed,
         foregroundColor: Colors.white,
         titleTextStyle: TextStyle(
+          fontFamily: 'ArianaVioleta',
           fontSize: 20,
-          fontWeight: FontWeight.bold, //SUMAREMOS nuestra fuente en la siguiente línea.
+          fontWeight:FontWeight.bold, 
           letterSpacing: 1.1,
         ),
       ),
