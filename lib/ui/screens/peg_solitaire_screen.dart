@@ -1,22 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:untitled/cell_type.dart';
+import 'package:logger/logger.dart';
+import 'package:untitled/core/enums/cell_type.dart';
+import 'package:untitled/ui/screens/RulesScreen.dart';
+import 'package:untitled/ui/widgets/peg_cell.dart';
 
 class PegSolitaireScreen extends StatelessWidget {
   const PegSolitaireScreen({Key? key}) : super(key: key);
   static const int gridSize = 7; // Tamaño del tablero (7x7)
   static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
+  static final Logger _logger = Logger();// placeholder eliminado abajo
 
-  CellType _getCellType(int row,int col){
+  CellType _getCellType(int row, int col) {
     final bool isCorner = (row < 2 || row > 4) && (col < 2 || col > 4);
-    if(isCorner) return CellType.voidCell; // Casilla no jugable
-    if(row == 3 && col == 3) return CellType.emptyHole; // Casilla jugable vacía
+    if (isCorner) return CellType.voidCell; // Casilla no jugable
+    if (row == 3 && col == 3) return CellType.emptyHole; // Casilla jugable vacía
     return CellType.occupiedPeg; // Casilla jugable con clavija presente
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Solitario')),
+      appBar: AppBar(
+        title: const Text('Solitario'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Reglas del juego',
+            onPressed: () {
+              _logger.i('Navegando a RulesScreen desde PegSolitaireScreen');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RulesScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
