@@ -3,9 +3,21 @@ import 'package:logger/logger.dart';
 import 'package:untitled/core/enums/cell_type.dart';
 import 'package:untitled/ui/screens/RulesScreen.dart';
 import 'package:untitled/ui/widgets/peg_cell.dart';
+import 'package:untitled/models/GameRecord.dart';
 
 class PegSolitaireScreen extends StatelessWidget {
-  const PegSolitaireScreen({Key? key}) : super(key: key);
+  PegSolitaireScreen({Key? key}) : super(key: key);
+  
+  // ignore: prefer_final_fields
+  GameRecord _lastGameRecord = GameRecord(
+    id: '1',
+    date: DateTime.now(),
+    remainingPegs: 33,
+    totalMoves: 0,
+    durationSeconds: 349,
+    isVictory: false,
+  );
+  
   static const int gridSize = 7; // Tamaño del tablero (7x7)
   static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
@@ -29,6 +41,7 @@ class PegSolitaireScreen extends StatelessWidget {
             tooltip: 'Reglas del juego',
             onPressed: () {
               _logger.i('Navegando a RulesScreen desde PegSolitaireScreen');
+              _logger.i('Último registro de juego: $_lastGameRecord');
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const RulesScreen()),
