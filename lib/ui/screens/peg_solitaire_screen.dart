@@ -10,8 +10,8 @@ class PegSolitaireScreen extends StatefulWidget {
 
   @override
   State<PegSolitaireScreen> createState() => _PegSolitaireScreenState();
+  
 }
-
 class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
   // ignore: prefer_final_fields
   GameRecord _lastGameRecord = GameRecord(
@@ -22,13 +22,25 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
     durationSeconds: 349,
     isVictory: false,
   );
-  int? _selectedRow;
-  int? _selectedCol;
+  int? rowSelected;
+  int? colSelected;
   static const int gridSize = 7; // Tamaño del tablero (7x7)
   static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
   static final Logger _logger = Logger();// placeholder eliminado abajo
-
+  void _handleCellTapped(int row, int col, CellType type){
+    if (type == CellType.voidCell) return; // No hacer nada si la celda es voidCell
+    setState((){
+      if(rowSelected == row && colSelected == col){
+        _logger.d('Deseleccionada celda en : ${rowSelected}, ${colSelected}');
+      } else {
+        rowSelected = row;
+        colSelected = col;
+        _logger.d('Seleccionada celda para acción: ${row}, ${col} | tipo: $type');
+      }
+    });
+  }
+  
   CellType _getCellType(int row, int col) {
     final bool isCorner = (row < 2 || row > 4) && (col < 2 || col > 4);
     if (isCorner) return CellType.voidCell; // Casilla no jugable
@@ -99,11 +111,14 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
               final int row = index ~/ gridSize;
               final int col = index % gridSize;
               final CellType cellType = _getCellType(row, col);
+              final bool isSelected = (rowSelected == row && colSelected == col);
 
               return PegCell(
                 row: row,
                 col: col,
                 type: cellType,
+                isSelected: isSelected,//pasa el estado reactivo
+                onTap: () => _handleCellTapped(row, col, cellType),
               );
             },
           ),

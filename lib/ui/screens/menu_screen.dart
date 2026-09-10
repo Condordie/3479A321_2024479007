@@ -27,6 +27,13 @@ class MenuScreen extends StatelessWidget {
               },
               child: const Text('Reglas del Juego'),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/history');
+              },
+              child: const Text('Historial de Partidas'),
+            ),
           ],
         ),
       ),
