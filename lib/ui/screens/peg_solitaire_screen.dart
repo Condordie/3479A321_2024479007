@@ -5,9 +5,14 @@ import 'package:untitled/ui/screens/RulesScreen.dart';
 import 'package:untitled/ui/widgets/peg_cell.dart';
 import 'package:untitled/models/GameRecord.dart';
 
-class PegSolitaireScreen extends StatelessWidget {
+class PegSolitaireScreen extends StatefulWidget {
   PegSolitaireScreen({Key? key}) : super(key: key);
-  
+
+  @override
+  State<PegSolitaireScreen> createState() => _PegSolitaireScreenState();
+}
+
+class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
   // ignore: prefer_final_fields
   GameRecord _lastGameRecord = GameRecord(
     id: '1',
@@ -17,7 +22,8 @@ class PegSolitaireScreen extends StatelessWidget {
     durationSeconds: 349,
     isVictory: false,
   );
-  
+  int? _selectedRow;
+  int? _selectedCol;
   static const int gridSize = 7; // Tamaño del tablero (7x7)
   static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
@@ -29,6 +35,7 @@ class PegSolitaireScreen extends StatelessWidget {
     if (row == 3 && col == 3) return CellType.emptyHole; // Casilla jugable vacía
     return CellType.occupiedPeg; // Casilla jugable con clavija presente
   }
+
 
   @override
   Widget build(BuildContext context) {
