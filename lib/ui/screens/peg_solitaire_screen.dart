@@ -28,15 +28,17 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
   static const int totalCells = gridSize * gridSize; // Total de celdas (49)
 
   static final Logger _logger = Logger();// placeholder eliminado abajo
-  void _handleCellTapped(int row, int col, CellType type){
-    if (type == CellType.voidCell) return; // No hacer nada si la celda es voidCell
-    setState((){
-      if(rowSelected == row && colSelected == col){
-        _logger.d('Deseleccionada celda en : ${rowSelected}, ${colSelected}');
+  void _handleCellTapped(int row, int col, CellType type) {
+    if (type == CellType.voidCell) return;
+    setState(() {
+      if (rowSelected == row && colSelected == col) {
+        _logger.d('Deseleccionada celda en: $row, $col');
+        rowSelected = null;
+        colSelected = null;
       } else {
         rowSelected = row;
         colSelected = col;
-        _logger.d('Seleccionada celda para acción: ${row}, ${col} | tipo: $type');
+        _logger.d('Callback onTap -> seleccionada celda: $row, $col | tipo: $type');
       }
     });
   }

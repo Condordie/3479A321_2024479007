@@ -19,34 +19,41 @@ class PegCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[400],
-        border: Border.all(color: Colors.grey[600]!, width: 1.5),
-      ),
-      child: Center(
-        child: type == CellType.occupiedPeg
-            ? Container(
-                width: 30,
-                height: 30,
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 20)
-                    : Image.asset('assets/icons/icono.jpg'),
-              )
-            : type == CellType.emptyHole
-                ? Container(
-                    width: 30,
-                    height: 30,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                  )
-                : null,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap, // ahora sí se usa el callback
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.amber[200] : Colors.grey[400],
+          border: Border.all(
+            color: isSelected ? Colors.amber[800]! : Colors.grey[600]!,
+            width: isSelected ? 3 : 1.5,
+          ),
+        ),
+        child: Center(
+          child: type == CellType.occupiedPeg
+              ? Container(
+                  width: 30,
+                  height: 30,
+                  decoration: const BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      : Image.asset('assets/icons/icono.jpg'),
+                )
+              : type == CellType.emptyHole
+                  ? Container(
+                      width: 30,
+                      height: 30,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                  : null,
+        ),
       ),
     );
   }
