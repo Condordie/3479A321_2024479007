@@ -1,68 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
 import 'package:untitled/core/enums/cell_type.dart';
+import 'package:untitled/models/board_position.dart';
 import 'package:untitled/ui/screens/RulesScreen.dart';
 import 'package:untitled/ui/widgets/peg_cell.dart';
-import 'package:untitled/models/GameRecord.dart';
+import 'package:untitled/viewmodels/peg_solitaire_viewmodel.dart';
 
-class PegSolitaireScreen extends StatefulWidget {
-  PegSolitaireScreen({Key? key}) : super(key: key);
+class PegSolitaireScreen extends StatelessWidget {
+  const PegSolitaireScreen({super.key});
 
-  @override
-  State<PegSolitaireScreen> createState() => _PegSolitaireScreenState();
-  
-}
-class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
-  // ignore: prefer_final_fields
-  GameRecord _lastGameRecord = GameRecord(
-    id: '1',
-    date: DateTime.now(),
-    remainingPegs: 33,
-    totalMoves: 0,
-    durationSeconds: 349,
-    isVictory: false,
-  );
-  int? rowSelected;
-  int? colSelected;
-  static const int gridSize = 7; // Tamaño del tablero (7x7)
-  static const int totalCells = gridSize * gridSize; // Total de celdas (49)
-
-  static final Logger _logger = Logger();// placeholder eliminado abajo
-  void _handleCellTapped(int row, int col, CellType type) {
-    if (type == CellType.voidCell) return;
-    setState(() {
-      if (rowSelected == row && colSelected == col) {
-        _logger.d('Deseleccionada celda en: $row, $col');
-        rowSelected = null;
-        colSelected = null;
-      } else {
-        rowSelected = row;
-        colSelected = col;
-        _logger.d('Callback onTap -> seleccionada celda: $row, $col | tipo: $type');
-      }
-    });
-  }
-  
-  CellType _getCellType(int row, int col) {
-    final bool isCorner = (row < 2 || row > 4) && (col < 2 || col > 4);
-    if (isCorner) return CellType.voidCell; // Casilla no jugable
-    if (row == 3 && col == 3) return CellType.emptyHole; // Casilla jugable vacía
-    return CellType.occupiedPeg; // Casilla jugable con clavija presente
-  }
-
+  static final Logger _logger = Logger();
 
   @override
   Widget build(BuildContext context) {
+    // watch: se suscribe al ViewModel y redibuja cuando este notifica cambios
+    final vm = context.watch<PegSolitaireViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Solitario'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.undo_rounded),
+            tooltip: 'Deshacer movimiento',
+            onPressed: vm.canUndo
+                ? () => context.read<PegSolitaireViewModel>().undoMove()
+                : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Reiniciar Tablero',
+            // read: solo despacha una acción, no se suscribe
+            onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
+          ),
+          IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Reglas del juego',
             onPressed: () {
               _logger.i('Navegando a RulesScreen desde PegSolitaireScreen');
-              _logger.i('Último registro de juego: $_lastGameRecord');
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const RulesScreen()),
@@ -74,27 +50,39 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              height: 60,
-              color: Colors.grey[300],
-              child: const Center(
-                child: Text(
-                  'STATUS: 349 segundos | Piezas restantes: 33',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-              ),
-            ),
+            // Área de status
+            _buildScoreBoard(context, vm),
             const Divider(height: 1),
+            // Área de juego
             Expanded(
-              child: _gameBoard(), // <- antes era el Text('Tablero de Juego')
+              child: _gameBoard(context, vm),
             ),
+            // Mensaje de finalización
+            if (vm.isGameOver) _buildGameOverBanner(context, vm),
           ],
         ),
       ),
     );
   }
 
-  Widget _gameBoard() {
+  Widget _buildScoreBoard(BuildContext context, PegSolitaireViewModel vm) {
+    return Container(
+      height: 60,
+      color: Colors.grey[300],
+      child: Center(
+        child: Text(
+          'Piezas restantes: ${vm.remainingPegs} | Movimientos: ${vm.moveCount}',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+      ),
+    );
+  }
+
+  Widget _gameBoard(BuildContext context, PegSolitaireViewModel vm) {
+    _logger.i('Construyendo el tablero de juego');
+    // Destinos válidos calculados una sola vez por redibujado
+    final validDestinations = vm.getValidDestinations();
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -103,28 +91,57 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(), // Bloquea el scroll
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7, // 7 columnas
+              crossAxisCount: PegSolitaireViewModel.gridSize, // 7 columnas
               crossAxisSpacing: 2.0,
               mainAxisSpacing: 2.0,
             ),
-            itemCount: 49, // 7x7 = 49 celdas
+            itemCount:
+                PegSolitaireViewModel.gridSize * PegSolitaireViewModel.gridSize, // 49 celdas
             itemBuilder: (context, index) {
               // Convertir el índice en coordenadas matriciales
-              final int row = index ~/ gridSize;
-              final int col = index % gridSize;
-              final CellType cellType = _getCellType(row, col);
-              final bool isSelected = (rowSelected == row && colSelected == col);
+              final int row = index ~/ PegSolitaireViewModel.gridSize;
+              final int col = index % PegSolitaireViewModel.gridSize;
+              final position = BoardPosition(row, col);
+              final CellType cellType = vm.getCellType(row, col);
 
               return PegCell(
-                row: row,
-                col: col,
-                type: cellType,
-                isSelected: isSelected,//pasa el estado reactivo
-                onTap: () => _handleCellTapped(row, col, cellType),
+                position: position,
+                cellType: cellType,
+                isSelected: vm.isCellSelected(position), // estado reactivo
+                isValidDestination: validDestinations.contains(position),
+                onTap: () => context.read<PegSolitaireViewModel>().onCellTapped(position),
               );
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGameOverBanner(BuildContext context, PegSolitaireViewModel vm) {
+    final theme = Theme.of(context);
+    final bool isVictory = vm.isVictory;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      color: isVictory ? Colors.green[100] : theme.colorScheme.errorContainer,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            isVictory ? '¡Victoria!' : 'Fin del juego: sin movimientos válidos',
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text('Movimientos: ${vm.moveCount} | Piezas restantes: ${vm.remainingPegs}'),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Jugar de nuevo'),
+            onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
+          ),
+        ],
       ),
     );
   }

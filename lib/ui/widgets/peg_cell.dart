@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:untitled/core/enums/cell_type.dart';
+import 'package:untitled/models/board_position.dart';
 
 class PegCell extends StatelessWidget {
-  final int row;
-  final int col;
-  final CellType type;
+  final BoardPosition position;
+  final CellType cellType;
   final bool isSelected;
+  final bool isValidDestination;
   final VoidCallback? onTap;
 
   const PegCell({
     super.key,
-    required this.row,
-    required this.col,
-    required this.type,
+    required this.position,
+    required this.cellType,
     this.isSelected = false,
+    this.isValidDestination = false,
     this.onTap,
   });
 
@@ -21,17 +22,21 @@ class PegCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap, // ahora sí se usa el callback
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: isSelected ? Colors.amber[200] : Colors.grey[400],
           border: Border.all(
-            color: isSelected ? Colors.amber[800]! : Colors.grey[600]!,
-            width: isSelected ? 3 : 1.5,
+            color: isSelected
+                ? Colors.amber[800]!
+                : isValidDestination
+                    ? Colors.green[300]!
+                    : Colors.grey[600]!,
+            width: (isSelected || isValidDestination) ? 3 : 1.5,
           ),
         ),
         child: Center(
-          child: type == CellType.occupiedPeg
+          child: cellType == CellType.occupiedPeg
               ? Container(
                   width: 30,
                   height: 30,
@@ -43,7 +48,7 @@ class PegCell extends StatelessWidget {
                       ? const Icon(Icons.check, color: Colors.white, size: 20)
                       : Image.asset('assets/icons/icono.jpg'),
                 )
-              : type == CellType.emptyHole
+              : cellType == CellType.emptyHole
                   ? Container(
                       width: 30,
                       height: 30,

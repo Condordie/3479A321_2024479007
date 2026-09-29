@@ -15,6 +15,9 @@ class PegSolitaireViewModel extends ChangeNotifier {
   bool _isGameOver = false;
   bool _isVictory = false;
 
+  // Pila de deshacer: instantáneas del tablero previas a cada salto
+  final List<List<List<CellType>>> _history = [];
+
   // Getters expuestos hacia la UI
   List<List<CellType>> get board => _board;
   BoardPosition? get selectedPosition => _selectedPosition;
@@ -22,6 +25,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
   int get moveCount => _moveCount;
   bool get isGameOver => _isGameOver;
   bool get isVictory => _isVictory;
+  bool get canUndo => _history.isNotEmpty;
 
   PegSolitaireViewModel() {
     initializeBoard();
@@ -42,6 +46,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
       });
     });
     _selectedPosition = null;
+    _history.clear();
     _remainingPegs = 32;
     _moveCount = 0;
     _isGameOver = false;
@@ -58,6 +63,32 @@ class PegSolitaireViewModel extends ChangeNotifier {
   }
 
   bool isCellSelected(BoardPosition pos) => _selectedPosition == pos;
+
+  /// Destinos válidos para la ficha seleccionada (vacía si no hay selección).
+  List<BoardPosition> getValidDestinations() {
+    final BoardPosition? origin = _selectedPosition;
+    if (origin == null) return [];
+
+    const List<List<int>> directions = [
+      [-2, 0], // Arriba
+      [2, 0], // Abajo
+      [0, -2], // Izquierda
+      [0, 2], // Derecha
+    ];
+
+    final List<BoardPosition> destinations = [];
+    for (final dir in directions) {
+      final int r = origin.row + dir[0];
+      final int c = origin.col + dir[1];
+      if (r >= 0 && r < gridSize && c >= 0 && c < gridSize) {
+        final to = BoardPosition(r, c);
+        if (_board[r][c] != CellType.voidCell && _isValidMove(origin, to)) {
+          destinations.add(to);
+        }
+      }
+    }
+    return destinations;
+  }
 
   /// FSM de interacción: IDLE <-> SOURCE_SELECTED
   void onCellTapped(BoardPosition pos) {
@@ -106,6 +137,19 @@ class PegSolitaireViewModel extends ChangeNotifier {
     }
   }
 
+  /// Restaura la última instantánea del tablero.
+  void undoMove() {
+    if (_history.isEmpty) return;
+    _board = _history.removeLast();
+    _remainingPegs++;
+    _moveCount--;
+    _selectedPosition = null;
+    _isGameOver = false;
+    _isVictory = false;
+    _logger.i('Movimiento deshecho | Clavijas restantes: $_remainingPegs');
+    notifyListeners();
+  }
+
   /// Ortogonalidad estricta: salto de exactamente 2 casillas en línea recta.
   bool _isValidMove(BoardPosition from, BoardPosition to) {
     final int rowDelta = (from.row - to.row).abs();
@@ -129,6 +173,9 @@ class PegSolitaireViewModel extends ChangeNotifier {
 
   /// Mutación del tablero: mueve la clavija y captura la intermedia.
   void _executeMove(BoardPosition from, BoardPosition to) {
+    // Copia profunda del tablero antes de mutarlo (para deshacer)
+    _history.add(_board.map((row) => List<CellType>.from(row)).toList());
+
     final int midRow = (from.row + to.row) ~/ 2;
     final int midCol = (from.col + to.col) ~/ 2;
 
