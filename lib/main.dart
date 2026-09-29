@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'ui/screens/menu_screen.dart';
 import 'ui/screens/peg_solitaire_screen.dart';
-import 'ui/screens/RulesScreen.dart';
-import 'ui/screens/historyScreen.dart'; // cuando la crees
+import 'ui/screens/rules_screen.dart';
+import 'ui/screens/history_screen.dart'; // cuando la crees
 import 'package:provider/provider.dart';
 import 'viewmodels/peg_solitaire_viewmodel.dart';
 // import 'ui/theme/app_theme.dart'; // si ya tienes AppTheme
@@ -22,7 +22,6 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const MenuScreen(),
-        '/game': (context) => PegSolitaireScreen(),
         '/history': (context) => const HistoryScreen(),
         '/rules': (context) => const RulesScreen(),
         '/game': (context) => ChangeNotifierProvider(

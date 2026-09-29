@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:untitled/models/GameRecord.dart';
+import 'package:untitled/models/game_record.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -109,7 +109,7 @@ class HistoryScreen extends StatelessWidget {
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: record.isVictory
-                    ? Colors.green.withOpacity(0.15)
+                    ? Colors.green.withValues(alpha: 0.15)
                     : theme.colorScheme.errorContainer,
                 child: Icon(
                   record.isVictory ? Icons.emoji_events : Icons.close,

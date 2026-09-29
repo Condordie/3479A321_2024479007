@@ -3,7 +3,7 @@ import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:untitled/core/enums/cell_type.dart';
 import 'package:untitled/models/board_position.dart';
-import 'package:untitled/ui/screens/RulesScreen.dart';
+import 'package:untitled/ui/screens/rules_screen.dart';
 import 'package:untitled/ui/widgets/peg_cell.dart';
 import 'package:untitled/viewmodels/peg_solitaire_viewmodel.dart';
 
