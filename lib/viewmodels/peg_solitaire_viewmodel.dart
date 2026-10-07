@@ -23,7 +23,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
 
   PegSolitaireViewModel() {
     initializeBoard();
-    _initShakeTest();
+    //_initShakeTest();
   }
 
   void _initShakeTest() {
