@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:untitled/core/enums/cell_type.dart';
 import 'package:untitled/models/board_position.dart';
 import 'package:untitled/ui/screens/rules_screen.dart';
@@ -184,6 +185,26 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Jugar de nuevo'),
             onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
+          ),
+                    FilledButton.icon(
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Jugar de nuevo'),
+            onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.share_rounded),
+            label: const Text('Compartir resultado'),
+            onPressed: () async {
+              final String message =
+                  '¡He completado una partida de Peg Solitaire en ${vm.moveCount} movimientos dejando solo ${vm.remainingPegs} piezas!';
+
+              await SharePlus.instance.share(
+                ShareParams(
+                  text: message,
+                ),
+              );
+            },
           ),
         ],
       ),
