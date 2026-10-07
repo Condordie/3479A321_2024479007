@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:untitled/core/enums/cell_type.dart';
 import 'package:untitled/models/board_position.dart';
+import 'package:untitled/services/audio_service.dart';
+import 'package:untitled/services/shake_detector_service.dart';
 
 class PegSolitaireViewModel extends ChangeNotifier {
   static const int gridSize = 7;
@@ -17,7 +19,22 @@ class PegSolitaireViewModel extends ChangeNotifier {
 
   // Pila de deshacer: instantáneas del tablero previas a cada salto
   final List<List<List<CellType>>> _history = [];
+  ShakeDetectorService? _shakeDetector;
 
+  PegSolitaireViewModel() {
+    initializeBoard();
+    _initShakeTest();
+  }
+
+  void _initShakeTest() {
+    _shakeDetector = ShakeDetectorService(
+      shakeThreshold: 10.0, // Cambiar para las pruebas
+      onShake: () {
+        _logger.i('SHAKE DETECTADO');
+      },
+    );
+    _shakeDetector?.startListening();
+  }
   // Getters expuestos hacia la UI
   List<List<CellType>> get board => _board;
   BoardPosition? get selectedPosition => _selectedPosition;
@@ -27,10 +44,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
   bool get isVictory => _isVictory;
   bool get canUndo => _history.isNotEmpty;
 
-  PegSolitaireViewModel() {
-    initializeBoard();
-  }
-
+  
   void initializeBoard() {
     _board = List.generate(gridSize, (row) {
       return List.generate(gridSize, (col) {
@@ -101,6 +115,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
     if (_selectedPosition == null) {
       if (tappedType == CellType.occupiedPeg) {
         _selectedPosition = pos;
+        AudioService.instance.playSelect(); // Reproduce sonido de selección
         notifyListeners();
       }
       return;
@@ -119,6 +134,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
     // Transición 1.2: otra clavija propia -> alternar selección
     if (tappedType == CellType.occupiedPeg) {
       _selectedPosition = pos;
+      AudioService.instance.playSelect(); // Reproduce sonido de selección
       notifyListeners();
       return;
     }
@@ -129,6 +145,12 @@ class PegSolitaireViewModel extends ChangeNotifier {
         _executeMove(origin, pos);
         _selectedPosition = null; // regreso automático a IDLE
         _evaluateGameTermination();
+
+        if(isGameOver) {
+          AudioService.instance.playGameOver(); // Reproduce sonido de fin de juego
+        } else {
+          AudioService.instance.playJump(); // Reproduce sonido de salto
+        }
         notifyListeners();
       } else {
         _logger.w(
@@ -238,5 +260,10 @@ class PegSolitaireViewModel extends ChangeNotifier {
       }
     }
     return false;
+  }
+  @override
+  void dispose() {
+    _shakeDetector?.dispose(); // Evitar fugas de memoria al salir
+    super.dispose();
   }
 }
