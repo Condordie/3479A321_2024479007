@@ -3,6 +3,10 @@ import 'package:logger/logger.dart';
 import 'package:untitled/core/enums/cell_type.dart';
 import 'package:untitled/models/board_position.dart';
 import 'package:untitled/services/audio_service.dart';
+import 'package:untitled/models/game_record.dart';
+import 'package:untitled/models/move_record.dart';
+import 'package:untitled/repositories/game_history_repository.dart';
+import 'package:untitled/services/preferences_service.dart';
 
 class PegSolitaireViewModel extends ChangeNotifier {
   static const int gridSize = 7;
@@ -19,7 +23,15 @@ class PegSolitaireViewModel extends ChangeNotifier {
   // Pila de deshacer: instantáneas del tablero previas a cada salto
   final List<List<List<CellType>>> _history = [];
 
-  PegSolitaireViewModel() {
+    // Persistencia (inyectada) y registro de saltos de la partida en curso
+  final IGameHistoryRepository _historyRepository;
+  final PreferencesService _preferencesService;
+  final List<MoveRecord> _movesHistory = [];
+
+    PegSolitaireViewModel({
+    required this._historyRepository,
+    required this._preferencesService,
+  }) {
     initializeBoard();
   }
 
@@ -49,6 +61,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
     });
     _selectedPosition = null;
     _history.clear();
+    _movesHistory.clear();
     _remainingPegs = 32;
     _moveCount = 0;
     _isGameOver = false;
@@ -94,7 +107,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
 
   /// FSM de interacción: IDLE <-> SOURCE_SELECTED
   void onCellTapped(BoardPosition pos) {
-    if (_isGameOver) return;
+    if (_isGameOver) return; // Ignorar toques si el juego terminó
 
     final CellType tappedType = _board[pos.row][pos.col];
     if (tappedType == CellType.voidCell) return;
@@ -136,6 +149,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
 
         if(isGameOver) {
           AudioService.instance.playGameOver(); // Reproduce sonido de fin de juego
+          _persistCompletedGame();
         } else {
           AudioService.instance.playJump(); // Reproduce sonido de salto
         }
@@ -153,6 +167,9 @@ class PegSolitaireViewModel extends ChangeNotifier {
     _board = _history.removeLast();
     _remainingPegs++;
     _moveCount--;
+    if(_movesHistory.isNotEmpty) {
+      _movesHistory.removeLast();
+    }
     _selectedPosition = null;
     _isGameOver = false;
     _isVictory = false;
@@ -192,6 +209,11 @@ class PegSolitaireViewModel extends ChangeNotifier {
     _board[from.row][from.col] = CellType.emptyHole;
     _board[midRow][midCol] = CellType.emptyHole;
     _board[to.row][to.col] = CellType.occupiedPeg;
+    _movesHistory.add(MoveRecord(
+      from: from,
+      to: to,
+      timestamp: DateTime.now(),
+    ));
 
     _remainingPegs--;
     _moveCount++;
@@ -248,5 +270,23 @@ class PegSolitaireViewModel extends ChangeNotifier {
       }
     }
     return false;
+  }
+    Future<void> _persistCompletedGame() async {
+    final record = GameRecord(
+      id: 'REC-${DateTime.now().millisecondsSinceEpoch}',
+      date: DateTime.now(),
+      remainingPegs: _remainingPegs,
+      totalMoves: _moveCount,
+      durationSeconds: 0, // Se integrará con el cronómetro de sesión
+      isVictory: _isVictory,
+      moves: List.unmodifiable(_movesHistory),
+    );
+
+    try {
+      await _historyRepository.saveGame(record);
+      await _preferencesService.checkAndSaveRecord(_remainingPegs);
+    } catch (e) {
+      _logger.e('Error al guardar resumen en ViewModel: $e');
+    }
   }
 }
