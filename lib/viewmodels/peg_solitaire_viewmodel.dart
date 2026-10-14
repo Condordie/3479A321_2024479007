@@ -3,7 +3,6 @@ import 'package:logger/logger.dart';
 import 'package:untitled/core/enums/cell_type.dart';
 import 'package:untitled/models/board_position.dart';
 import 'package:untitled/services/audio_service.dart';
-import 'package:untitled/services/shake_detector_service.dart';
 
 class PegSolitaireViewModel extends ChangeNotifier {
   static const int gridSize = 7;
@@ -19,22 +18,11 @@ class PegSolitaireViewModel extends ChangeNotifier {
 
   // Pila de deshacer: instantáneas del tablero previas a cada salto
   final List<List<List<CellType>>> _history = [];
-  ShakeDetectorService? _shakeDetector;
 
   PegSolitaireViewModel() {
     initializeBoard();
-    //_initShakeTest();
   }
 
-  void _initShakeTest() {
-    _shakeDetector = ShakeDetectorService(
-      shakeThreshold: 10.0, // Cambiar para las pruebas
-      onShake: () {
-        _logger.i('SHAKE DETECTADO');
-      },
-    );
-    _shakeDetector?.startListening();
-  }
   // Getters expuestos hacia la UI
   List<List<CellType>> get board => _board;
   BoardPosition? get selectedPosition => _selectedPosition;
@@ -260,10 +248,5 @@ class PegSolitaireViewModel extends ChangeNotifier {
       }
     }
     return false;
-  }
-  @override
-  void dispose() {
-    _shakeDetector?.dispose(); // Evitar fugas de memoria al salir
-    super.dispose();
   }
 }
