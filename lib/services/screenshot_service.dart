@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -19,8 +20,7 @@ class ScreenshotService {
       }
 
       final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
-      final ui.ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) {
         AppLogger.warning('No se pudo serializar la imagen a PNG');
         return null;

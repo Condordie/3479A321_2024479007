@@ -9,7 +9,6 @@ import 'package:untitled/repositories/game_history_repository.dart';
 /// Implementación del repositorio respaldada en el sistema de archivos (JSON).
 class JsonFileHistoryRepository implements IGameHistoryRepository {
   static const String _fileName = 'games_history.json';
-  final Logger _logger = Logger();
 
   Future<File> _resolveLocalFile() async {
     // Resuelve la ruta segura en el sandbox de la aplicación (Documents Directory)
