@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:untitled/core/enums/cell_type.dart';
+import 'package:untitled/core/enums/move_result.dart';
+import 'package:untitled/core/utils/app_logger.dart';
 import 'package:untitled/models/board_position.dart';
+import 'package:untitled/services/preferences_service.dart';
+import 'package:untitled/services/screenshot_service.dart';
+import 'package:untitled/services/shake_detector_service.dart';
 import 'package:untitled/ui/screens/rules_screen.dart';
 import 'package:untitled/ui/widgets/peg_cell.dart';
-import 'package:untitled/services/shake_detector_service.dart';
 import 'package:untitled/viewmodels/peg_solitaire_viewmodel.dart';
 
 class PegSolitaireScreen extends StatefulWidget {
@@ -17,26 +21,24 @@ class PegSolitaireScreen extends StatefulWidget {
 }
 
 class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
-  static final Logger _logger = Logger();
+  /// Llave global que identifica la capa de pintado del tablero.
+  final GlobalKey _boardBoundaryKey = GlobalKey();
 
   ShakeDetectorService? _shakeDetector;
 
   @override
   void initState() {
     super.initState();
-    // Inicialización del detector de agitación
-    _shakeDetector = ShakeDetectorService(
-      onShake: _handleShakeEvent,
-    );
+    _shakeDetector = ShakeDetectorService(onShake: _handleShakeEvent);
     _shakeDetector?.startListening();
   }
 
   void _handleShakeEvent() {
+    if (!mounted) return;
     final vm = context.read<PegSolitaireViewModel>();
 
-    // REGLA DE NEGOCIO: Solo actuar si la partida ha terminado
     if (vm.isGameOver) {
-      _logger.i(
+      AppLogger.info(
           'Shake validado: Partida finalizada. Reiniciando tablero automáticamente.');
       vm.initializeBoard();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -46,20 +48,61 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
         ),
       );
     } else {
-      _logger.d('Shake ignorado: La partida se encuentra activa.');
+      AppLogger.debug('Shake ignorado: La partida se encuentra activa.');
     }
   }
 
   @override
   void dispose() {
-    // Liberación estricta para evitar fugas de memoria al salir de la pantalla
     _shakeDetector?.dispose();
     super.dispose();
   }
 
+  /// Despacha el toque al ViewModel y emite háptica según el resultado.
+  void _onCellTapped(BuildContext context, BoardPosition position) {
+    final vm = context.read<PegSolitaireViewModel>();
+    final prefs = context.read<PreferencesService>();
+
+    final MoveResult result = vm.onCellTapped(position);
+    if (!prefs.isVibrationEnabled) return;
+
+    switch (result) {
+      case MoveResult.selected:
+        HapticFeedback.lightImpact();
+        break;
+      case MoveResult.jumped:
+        HapticFeedback.mediumImpact();
+        break;
+      case MoveResult.gameOver:
+        HapticFeedback.heavyImpact();
+        break;
+      case MoveResult.deselected:
+      case MoveResult.invalid:
+      case MoveResult.ignored:
+        break; // Sin vibración "a ciegas" en acciones inválidas
+    }
+  }
+
+  Future<void> _shareResult(PegSolitaireViewModel vm) async {
+    final String message =
+        '¡He completado una partida de Peg Solitaire en ${vm.moveCount} movimientos dejando solo ${vm.remainingPegs} piezas!';
+
+    final String? imagePath =
+        await ScreenshotService.captureWidgetToImage(_boardBoundaryKey);
+    if (imagePath == null) {
+      AppLogger.warning('Se comparte solo texto: no hubo captura del tablero');
+    }
+
+    await SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        files: imagePath != null ? [XFile(imagePath)] : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // watch: se suscribe al ViewModel y redibuja cuando este notifica cambios
     final vm = context.watch<PegSolitaireViewModel>();
 
     return Scaffold(
@@ -76,14 +119,13 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Reiniciar Tablero',
-            // read: solo despacha una acción, no se suscribe
             onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
           ),
           IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Reglas del juego',
             onPressed: () {
-              _logger.i('Navegando a RulesScreen desde PegSolitaireScreen');
+              AppLogger.info('Navegando a RulesScreen desde PegSolitaireScreen');
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const RulesScreen()),
@@ -95,14 +137,18 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Área de status
             _buildScoreBoard(context, vm),
             const Divider(height: 1),
-            // Área de juego
             Expanded(
-              child: _gameBoard(context, vm),
+              // Capa de pintado aislada: solo el tablero se captura como imagen
+              child: RepaintBoundary(
+                key: _boardBoundaryKey,
+                child: ColoredBox(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  child: _gameBoard(context, vm),
+                ),
+              ),
             ),
-            // Mensaje de finalización
             if (vm.isGameOver) _buildGameOverBanner(context, vm),
           ],
         ),
@@ -124,26 +170,23 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
   }
 
   Widget _gameBoard(BuildContext context, PegSolitaireViewModel vm) {
-    _logger.i('Construyendo el tablero de juego');
-    // Destinos válidos calculados una sola vez por redibujado
     final validDestinations = vm.getValidDestinations();
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: AspectRatio(
-          aspectRatio: 1.0, // Cuadrado perfecto
+          aspectRatio: 1.0,
           child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(), // Bloquea el scroll
+            physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: PegSolitaireViewModel.gridSize, // 7 columnas
+              crossAxisCount: PegSolitaireViewModel.gridSize,
               crossAxisSpacing: 2.0,
               mainAxisSpacing: 2.0,
             ),
             itemCount:
-                PegSolitaireViewModel.gridSize * PegSolitaireViewModel.gridSize, // 49 celdas
+                PegSolitaireViewModel.gridSize * PegSolitaireViewModel.gridSize,
             itemBuilder: (context, index) {
-              // Convertir el índice en coordenadas matriciales
               final int row = index ~/ PegSolitaireViewModel.gridSize;
               final int col = index % PegSolitaireViewModel.gridSize;
               final position = BoardPosition(row, col);
@@ -152,9 +195,9 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
               return PegCell(
                 position: position,
                 cellType: cellType,
-                isSelected: vm.isCellSelected(position), // estado reactivo
+                isSelected: vm.isCellSelected(position),
                 isValidDestination: validDestinations.contains(position),
-                onTap: () => context.read<PegSolitaireViewModel>().onCellTapped(position),
+                onTap: () => _onCellTapped(context, position),
               );
             },
           ),
@@ -186,25 +229,11 @@ class _PegSolitaireScreenState extends State<PegSolitaireScreen> {
             label: const Text('Jugar de nuevo'),
             onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
           ),
-                    FilledButton.icon(
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Jugar de nuevo'),
-            onPressed: () => context.read<PegSolitaireViewModel>().initializeBoard(),
-          ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.share_rounded),
             label: const Text('Compartir resultado'),
-            onPressed: () async {
-              final String message =
-                  '¡He completado una partida de Peg Solitaire en ${vm.moveCount} movimientos dejando solo ${vm.remainingPegs} piezas!';
-
-              await SharePlus.instance.share(
-                ShareParams(
-                  text: message,
-                ),
-              );
-            },
+            onPressed: () => _shareResult(vm),
           ),
         ],
       ),
