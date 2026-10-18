@@ -1,4 +1,4 @@
-import 'package:logger/logger.dart';
+import 'package:untitled/core/utils/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PreferencesService {
@@ -8,7 +8,6 @@ class PreferencesService {
   static const String _keyBestScore = 'best_remaining_pegs';
 
   final SharedPreferences _prefs;
-  final Logger _logger = Logger();
 
   PreferencesService(this._prefs);
 
@@ -23,19 +22,19 @@ class PreferencesService {
   int get bestRemainingPegs => _prefs.getInt(_keyBestScore) ?? 32;
 
   Future<bool> setSoundEnabled(bool enabled) async {
-    _logger.i('PreferencesService: Sonido configurado en $enabled');
+    AppLogger.info('PreferencesService: Sonido configurado en $enabled');
     return await _prefs.setBool(_keySoundEnabled, enabled);
   }
 
   Future<bool> setVibrationEnabled(bool enabled) async {
-    _logger.i('PreferencesService: Vibración configurada en $enabled');
+    AppLogger.info('PreferencesService: Vibración configurada en $enabled');
     return await _prefs.setBool(_keyVibrationEnabled, enabled);
   }
 
   /// Guarda el récord solo si mejora el actual (menos piezas restantes).
   Future<bool> checkAndSaveRecord(int remainingPegs) async {
     if (remainingPegs < bestRemainingPegs) {
-      _logger.i('PreferencesService: Nuevo récord con $remainingPegs piezas');
+      AppLogger.info('PreferencesService: Nuevo récord con $remainingPegs piezas');
       return await _prefs.setInt(_keyBestScore, remainingPegs);
     }
     return false;
@@ -43,7 +42,7 @@ class PreferencesService {
 
   /// Restablece el puntaje más alto al valor inicial (32).
   Future<bool> resetBestScore() async {
-    _logger.i('PreferencesService: Récord restablecido a 32');
+    AppLogger.info('PreferencesService: Récord restablecido a 32');
     return await _prefs.setInt(_keyBestScore, 32);
   }
 }
