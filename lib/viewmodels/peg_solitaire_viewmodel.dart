@@ -1,15 +1,17 @@
 import 'package:flutter/foundation.dart';
-import 'package:logger/logger.dart';
 import 'package:untitled/core/enums/cell_type.dart';
+import 'package:untitled/core/enums/move_result.dart';
+import 'package:untitled/core/utils/app_logger.dart';
 import 'package:untitled/models/board_position.dart';
+import 'package:untitled/models/game_record.dart';
+import 'package:untitled/models/move_record.dart';
+import 'package:untitled/repositories/game_history_repository.dart';
 import 'package:untitled/services/audio_service.dart';
-import 'package:untitled/services/shake_detector_service.dart';
+import 'package:untitled/services/preferences_service.dart';
 
 class PegSolitaireViewModel extends ChangeNotifier {
   static const int gridSize = 7;
-  static final Logger _logger = Logger();
 
-  // Estado interno matricial y contadores
   late List<List<CellType>> _board;
   BoardPosition? _selectedPosition;
   int _remainingPegs = 0;
@@ -17,25 +19,21 @@ class PegSolitaireViewModel extends ChangeNotifier {
   bool _isGameOver = false;
   bool _isVictory = false;
 
-  // Pila de deshacer: instantáneas del tablero previas a cada salto
   final List<List<List<CellType>>> _history = [];
-  ShakeDetectorService? _shakeDetector;
 
-  PegSolitaireViewModel() {
+  final IGameHistoryRepository _historyRepository;
+  final PreferencesService _preferencesService;
+  final AudioService? _audioService;
+  final List<MoveRecord> _movesHistory = [];
+
+  PegSolitaireViewModel({
+    required this._historyRepository,
+    required this._preferencesService,
+    this._audioService,
+  }) {
     initializeBoard();
-    //_initShakeTest();
   }
 
-  void _initShakeTest() {
-    _shakeDetector = ShakeDetectorService(
-      shakeThreshold: 10.0, // Cambiar para las pruebas
-      onShake: () {
-        _logger.i('SHAKE DETECTADO');
-      },
-    );
-    _shakeDetector?.startListening();
-  }
-  // Getters expuestos hacia la UI
   List<List<CellType>> get board => _board;
   BoardPosition? get selectedPosition => _selectedPosition;
   int get remainingPegs => _remainingPegs;
@@ -44,15 +42,12 @@ class PegSolitaireViewModel extends ChangeNotifier {
   bool get isVictory => _isVictory;
   bool get canUndo => _history.isNotEmpty;
 
-  
   void initializeBoard() {
     _board = List.generate(gridSize, (row) {
       return List.generate(gridSize, (col) {
-        // Esquinas no jugables (bloques 2x2 en las cuatro esquinas)
         if ((row < 2 || row > 4) && (col < 2 || col > 4)) {
           return CellType.voidCell;
         }
-        // Centro estándar desocupado (3, 3)
         if (row == 3 && col == 3) {
           return CellType.emptyHole;
         }
@@ -61,6 +56,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
     });
     _selectedPosition = null;
     _history.clear();
+    _movesHistory.clear();
     _remainingPegs = 32;
     _moveCount = 0;
     _isGameOver = false;
@@ -68,7 +64,6 @@ class PegSolitaireViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Retorna el tipo de celda en una coordenada segura.
   CellType getCellType(int row, int col) {
     if (row < 0 || row >= gridSize || col < 0 || col >= gridSize) {
       return CellType.voidCell;
@@ -76,18 +71,27 @@ class PegSolitaireViewModel extends ChangeNotifier {
     return _board[row][col];
   }
 
+  /// Variante tipada por posición (útil para las pruebas unitarias).
+  CellType cellTypeAt(BoardPosition pos) => getCellType(pos.row, pos.col);
+
   bool isCellSelected(BoardPosition pos) => _selectedPosition == pos;
 
-  /// Destinos válidos para la ficha seleccionada (vacía si no hay selección).
+  /// Reproduce un sonido solo si hay servicio inyectado y el usuario lo permite.
+  void _playSound(void Function(AudioService audio) play) {
+    final audio = _audioService;
+    if (audio == null || !_preferencesService.isSoundEnabled) return;
+    play(audio);
+  }
+
   List<BoardPosition> getValidDestinations() {
     final BoardPosition? origin = _selectedPosition;
     if (origin == null) return [];
 
     const List<List<int>> directions = [
-      [-2, 0], // Arriba
-      [2, 0], // Abajo
-      [0, -2], // Izquierda
-      [0, 2], // Derecha
+      [-2, 0],
+      [2, 0],
+      [0, -2],
+      [0, 2],
     ];
 
     final List<BoardPosition> destinations = [];
@@ -104,88 +108,92 @@ class PegSolitaireViewModel extends ChangeNotifier {
     return destinations;
   }
 
-  /// FSM de interacción: IDLE <-> SOURCE_SELECTED
-  void onCellTapped(BoardPosition pos) {
-    if (_isGameOver) return;
+  /// FSM de interacción: IDLE <-> SOURCE_SELECTED.
+  /// Retorna qué ocurrió para que la UI pueda dar retroalimentación háptica.
+  MoveResult onCellTapped(BoardPosition pos) {
+    if (_isGameOver) return MoveResult.ignored;
 
     final CellType tappedType = _board[pos.row][pos.col];
-    if (tappedType == CellType.voidCell) return;
+    if (tappedType == CellType.voidCell) return MoveResult.ignored;
 
-    // ESTADO 0: IDLE (no hay origen seleccionado)
+    // ESTADO 0: IDLE
     if (_selectedPosition == null) {
       if (tappedType == CellType.occupiedPeg) {
         _selectedPosition = pos;
-        AudioService.instance.playSelect(); // Reproduce sonido de selección
+        _playSound((a) => a.playSelect());
         notifyListeners();
+        return MoveResult.selected;
       }
-      return;
+      return MoveResult.ignored;
     }
 
-    // ESTADO 1: SOURCE_SELECTED (hay una clavija origen activa)
+    // ESTADO 1: SOURCE_SELECTED
     final BoardPosition origin = _selectedPosition!;
 
-    // Transición 1.1: misma casilla -> deselección
     if (origin == pos) {
       _selectedPosition = null;
       notifyListeners();
-      return;
+      return MoveResult.deselected;
     }
 
-    // Transición 1.2: otra clavija propia -> alternar selección
     if (tappedType == CellType.occupiedPeg) {
       _selectedPosition = pos;
-      AudioService.instance.playSelect(); // Reproduce sonido de selección
+      _playSound((a) => a.playSelect());
       notifyListeners();
-      return;
+      return MoveResult.selected;
     }
 
-    // Transición 1.3: hueco vacío -> evaluar salto y captura
     if (tappedType == CellType.emptyHole) {
       if (_isValidMove(origin, pos)) {
         _executeMove(origin, pos);
-        _selectedPosition = null; // regreso automático a IDLE
+        _selectedPosition = null;
         _evaluateGameTermination();
 
-        if(isGameOver) {
-          AudioService.instance.playGameOver(); // Reproduce sonido de fin de juego
+        final MoveResult result;
+        if (_isGameOver) {
+          _playSound((a) => a.playGameOver());
+          _persistCompletedGame();
+          result = MoveResult.gameOver;
         } else {
-          AudioService.instance.playJump(); // Reproduce sonido de salto
+          _playSound((a) => a.playJump());
+          result = MoveResult.jumped;
         }
         notifyListeners();
+        return result;
       } else {
-        _logger.w(
+        AppLogger.warning(
             'Reglas: intento de salto inválido rechazado desde $origin hacia $pos');
+        return MoveResult.invalid;
       }
     }
+    return MoveResult.ignored;
   }
 
-  /// Restaura la última instantánea del tablero.
   void undoMove() {
     if (_history.isEmpty) return;
     _board = _history.removeLast();
     _remainingPegs++;
     _moveCount--;
+    if (_movesHistory.isNotEmpty) {
+      _movesHistory.removeLast();
+    }
     _selectedPosition = null;
     _isGameOver = false;
     _isVictory = false;
-    _logger.i('Movimiento deshecho | Clavijas restantes: $_remainingPegs');
+    AppLogger.info('Movimiento deshecho | Clavijas restantes: $_remainingPegs');
     notifyListeners();
   }
 
-  /// Ortogonalidad estricta: salto de exactamente 2 casillas en línea recta.
   bool _isValidMove(BoardPosition from, BoardPosition to) {
     final int rowDelta = (from.row - to.row).abs();
     final int colDelta = (from.col - to.col).abs();
 
-    // 1. Salto ortogonal estricto de distancia 2
     final bool isOrthogonalTwoStep =
         (rowDelta == 2 && colDelta == 0) || (rowDelta == 0 && colDelta == 2);
     if (!isOrthogonalTwoStep) return false;
 
-    // 2. El destino debe ser un hueco vacío
     if (_board[to.row][to.col] != CellType.emptyHole) return false;
 
-    // 3. La celda intermedia debe tener una clavija a capturar
     final int midRow = (from.row + to.row) ~/ 2;
     final int midCol = (from.col + to.col) ~/ 2;
     if (_board[midRow][midCol] != CellType.occupiedPeg) return false;
@@ -193,9 +201,7 @@ class PegSolitaireViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// Mutación del tablero: mueve la clavija y captura la intermedia.
   void _executeMove(BoardPosition from, BoardPosition to) {
-    // Copia profunda del tablero antes de mutarlo (para deshacer)
     _history.add(_board.map((row) => List<CellType>.from(row)).toList());
 
     final int midRow = (from.row + to.row) ~/ 2;
@@ -204,38 +210,39 @@ class PegSolitaireViewModel extends ChangeNotifier {
     _board[from.row][from.col] = CellType.emptyHole;
     _board[midRow][midCol] = CellType.emptyHole;
     _board[to.row][to.col] = CellType.occupiedPeg;
+    _movesHistory.add(MoveRecord(
+      from: from,
+      to: to,
+      timestamp: DateTime.now(),
+    ));
 
     _remainingPegs--;
     _moveCount++;
-    _logger.i(
+    AppLogger.info(
         'Salto ejecutado con éxito: $from -> $to | Clavijas restantes: $_remainingPegs');
   }
 
-  /// Evalúa victoria (1 clavija) o estancamiento (sin saltos válidos).
   void _evaluateGameTermination() {
-    // Victoria: queda exactamente 1 clavija
     if (_remainingPegs == 1) {
       _isGameOver = true;
       _isVictory = true;
-      _logger.i('¡VICTORIA! Partida completada en $_moveCount movimientos.');
+      AppLogger.info('¡VICTORIA! Partida completada en $_moveCount movimientos.');
       return;
     }
 
-    // Estancamiento: no quedan saltos válidos
     if (!_hasValidMovesRemaining()) {
       _isGameOver = true;
       _isVictory = false;
-      _logger.w('Fin de juego por bloqueo. No existen movimientos válidos.');
+      AppLogger.warning('Fin de juego por bloqueo. No existen movimientos válidos.');
     }
   }
 
-  /// Recorre el tablero buscando al menos un salto válido.
   bool _hasValidMovesRemaining() {
     const List<List<int>> directions = [
-      [-2, 0], // Arriba
-      [2, 0], // Abajo
-      [0, -2], // Izquierda
-      [0, 2], // Derecha
+      [-2, 0],
+      [2, 0],
+      [0, -2],
+      [0, 2],
     ];
 
     for (int r = 0; r < gridSize; r++) {
@@ -261,9 +268,23 @@ class PegSolitaireViewModel extends ChangeNotifier {
     }
     return false;
   }
-  @override
-  void dispose() {
-    _shakeDetector?.dispose(); // Evitar fugas de memoria al salir
-    super.dispose();
+
+  Future<void> _persistCompletedGame() async {
+    final record = GameRecord(
+      id: 'REC-${DateTime.now().millisecondsSinceEpoch}',
+      date: DateTime.now(),
+      remainingPegs: _remainingPegs,
+      totalMoves: _moveCount,
+      durationSeconds: 0,
+      isVictory: _isVictory,
+      moves: List.unmodifiable(_movesHistory),
+    );
+
+    try {
+      await _historyRepository.saveGame(record);
+      await _preferencesService.checkAndSaveRecord(_remainingPegs);
+    } catch (e, st) {
+      AppLogger.error('Error al guardar resumen en ViewModel', e, st);
+    }
   }
 }
